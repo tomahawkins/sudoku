@@ -1,11 +1,11 @@
 module Main (main) where
 
 import Data.List (transpose)
+import Data.Maybe (fromJust)
 
 import Board
-import FDSolver hiding (solve)
-import qualified FDSolver as FD
-import Sections (solve)
+import FDSolver
+--import Sections (solve)
 
 main :: IO ()
 main = do
@@ -16,17 +16,19 @@ main = do
   solve1 hard112
   solve1 garfield3
   solve1 garfield4
+  solve1 garfield5
 
-solve1 :: Board -> IO ()
+solve1 :: Board Int -> IO ()
 solve1 a = do
-  putStrLn $ unlines [ "    " ++ a ++ "    " ++ b | (a, b) <- zip (lines $ show a) (lines $ show b) ]
+  putStrLn $ unlines [ "    " ++ a ++ "    " ++ b ++ "    " ++ c | (a, b, c) <- zip3 (lines $ show a) (lines $ show b) (lines $ show c) ]
   putStrLn ""
   where
-  --b = solveBoard a
-  b = solve a
+  c@(Board c') = solveBoard a
+  b = Board $ map (map $ \ a -> case a of { Nothing -> Nothing; Just [a] -> Just a; Just _ -> Nothing }) c'
+  --b = solve a
 
-solveBoard :: Board -> Board
-solveBoard a = toBoard $ FD.solve $ do
+solveBoard :: Board Int -> Board [Int]
+solveBoard a = toBoard $ fromJust $ reduce $ do
   a <- fromBoard a
   mapM_ allConstraints a
   mapM_ allConstraints $ transpose a
@@ -49,13 +51,11 @@ sections a = [[s00, s01, s02], [s10, s11, s12], [s20, s21, s22]]
   s21 = transpose $ take 3 $ drop 3 r2
   s22 = transpose $          drop 6 r2
 
-fromBoard :: Board -> FD Int [[Var]]
+fromBoard :: Board Int -> FD Int [[Var]]
 fromBoard (Board a) = mapM (mapM $ \ a -> case a of { Nothing -> newVar [1 .. 9]; Just i -> newVar [i] }) a
 
-toBoard :: ([[Var]], Var -> [Int]) -> Board
-toBoard (a, f) = Board $ map (map f') a
-  where
-  f' a = if length (f a) == 1 then Just $ head $ f a else Nothing
+toBoard :: ([[Var]], Var -> [Int]) -> Board [Int]
+toBoard (a, f) = Board $ map (map (Just . f)) a
 
 allConstraints a = do
   allDifferent a
@@ -111,7 +111,7 @@ notIn' vars (a, b) = do
     assert $ foldl1 (:&&) [ a :/= var | a <- a ] :-> foldl1 (:&&) [ b :/= var | b <- b ]
     assert $ foldl1 (:&&) [ b :/= var | b <- b ] :-> foldl1 (:&&) [ a :/= var | a <- a ]
 
-easy :: Board
+easy :: Board Int
 easy = parseBoard $ unlines
   [ "9  5  7 2"
   , " 2 97 8  "
@@ -124,7 +124,7 @@ easy = parseBoard $ unlines
   , "2 4  9  7"
   ]
 
-med29 :: Board
+med29 :: Board Int
 med29 = parseBoard $ unlines
   [ " 87   5  "
   , "    48  7"
@@ -137,7 +137,7 @@ med29 = parseBoard $ unlines
   , "  3   16 "
   ]
 
-med30 :: Board
+med30 :: Board Int
 med30 = parseBoard $ unlines
   [ "   95 8 1"
   , " 5   4  2"
@@ -150,7 +150,7 @@ med30 = parseBoard $ unlines
   , "3 5 29   "
   ]
 
-hard111 :: Board
+hard111 :: Board Int
 hard111 = parseBoard $ unlines
   [ "  3  62 7"
   , " 9 7 2   "
@@ -163,7 +163,7 @@ hard111 = parseBoard $ unlines
   , "3 16  7  "
   ]
 
-hard112 :: Board
+hard112 :: Board Int
 hard112 = parseBoard $ unlines
   [ "  54    7"
   , " 9 3   65"
@@ -176,7 +176,7 @@ hard112 = parseBoard $ unlines
   , "5    98  "
   ]
 
-garfield3 :: Board
+garfield3 :: Board Int
 garfield3 = parseBoard $ unlines
   [ "  91 63  "
   , " 6  4 9  "
@@ -189,7 +189,7 @@ garfield3 = parseBoard $ unlines
   , "  64 38  "
   ]
 
-garfield4 :: Board
+garfield4 :: Board Int
 garfield4 = parseBoard $ unlines
   [ "69  8  4 "
   , "2   5   8"
@@ -200,5 +200,18 @@ garfield4 = parseBoard $ unlines
   , "7 2    5 "
   , "9   1   7"
   , " 3  6  24"
+  ]
+
+garfield5 :: Board Int
+garfield5 = parseBoard $ unlines
+  [ "1  2 3   "
+  , "  21 9 7 "
+  , "    7   8"
+  , " 916     "
+  , "  4 2 6  "
+  , "     781 "
+  , "2   6    "
+  , " 5 3 87  "
+  , "   9 2  5"
   ]
 

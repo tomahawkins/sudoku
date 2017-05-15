@@ -5,8 +5,8 @@ module FDSolver
   ( FD
   , Var (..)
   , E (..)
-  , solve
-  , solve'
+  , reduce
+  -- , solve'
   , newVar
   , assert
   ) where
@@ -42,31 +42,43 @@ infixl 3 :&&
 infixl 2 :||
 infixr 1 :->
 
--- | Solve a set of constraints and update a structure with solved domain values.
-solve :: Ord a => FD a b -> (b, Var -> [a])
-solve fd =  (b, \ (Var i) -> solvedVars !! i)
+-- | Reduce a set of constraints and update a structure with solved domain values.
+--   Returns Nothing if overconstrained.
+reduce :: Ord a => FD a b -> Maybe (b, Var -> [a])
+reduce fd = do
+  solvedVars <- applyConstraints (constraints db) (variables db)
+  return (b, \ (Var i) -> solvedVars !! i)
   where
   (b, db) = runId $ runStateT (FDDB 0 [] []) fd
-  solvedVars = applyConstraints (constraints db) $ variables db
 
+{-
 solve' :: Ord a => FD a b -> (b, Var -> (Var, [a]), [E])
 solve' fd =  (b, \ (Var i) -> (Var i, solvedVars !! i), constraints db)
   where
   (b, db) = runId $ runStateT (FDDB 0 [] []) fd
   solvedVars = applyConstraints (constraints db) $ variables db
+  -}
 
-applyConstraints :: Ord a => [E] -> [[a]] -> [[a]]
+applyConstraints :: Ord a => [E] -> [[a]] -> Maybe [[a]]
 applyConstraints constraints vars
-  | vars == vars' = vars
+  | any null vars = Nothing
+  | vars == vars' = Just vars
   | otherwise     = applyConstraints constraints vars'
   where
   vars' = foldr applyConstraint vars constraints
 
 applyConstraint :: Ord a => E -> [[a]] -> [[a]]
 applyConstraint a vars = case a of
-  a :$= b -> foldr (\ (Var a) vars -> replace ((vars !! a) `intersect` vars') a vars) vars (a ++ b)
+  a :$= b -> filterPossibleVars vars
     where
-    vars' = (nub $ concat [ vars !! a | Var a <- a ]) `intersect` (nub $ concat [ vars !! b | Var b <- b ])
+    possibleSetValues = (nub $ concat [ vars !! a | Var a <- a ]) `intersect` (nub $ concat [ vars !! b | Var b <- b ])
+    filterPossibleVars vars = foldr (\ (Var a) vars -> replace ((vars !! a) `intersect` possibleSetValues) a vars) vars (a ++ b)
+    knownSetValues vars = [ head $ vars !! i | Var i <- a ++ b, length (vars !! i) == 1 ]
+    filterKnownSetValues a vars = :: [a] -> 
+      where
+      known = knownSetValues vars
+      a' = map (\ (Var i) -> vars !! i) a
+
   Var a :== Var b -> replace n a $ replace n b vars where n = (vars !! a) `intersect` (vars !! b)
   Var a :/= Var b
     | length (vars !! a) == 1 -> replace ((vars !! b) \\ (vars !! a)) b vars
@@ -116,7 +128,7 @@ eval vars a = case a of
     | otherwise -> Nothing
   a :$= b
     | all (\ a -> length a == 1) (a' ++ b') && length a == length b -> Just (sort (concat a') == sort (concat b'))
-    | otherwise -> Nothing
+    | otherwise -> Nothing  -- XXX Can strengthen this by checking if any values are known and not in the other set.
     where
     a' = [ vars !! a | Var a <- a]
     b' = [ vars !! b | Var b <- b]

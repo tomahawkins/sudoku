@@ -1,37 +1,35 @@
 module Board
   ( Board (..)
-  , Coordinate
-  , Sym
   , parseBoard
   ) where
 
 import Data.List
 
 -- | Abstract datatype of a Sudoku board.
-data Board = Board [[Maybe Sym]]
+data Board a = Board [[Maybe a]]
 
--- Sudoku symbols: 1-9.
-type Sym = Int
-
--- | Coordinate of space on board (row, column).  Upper left is (0, 0).
-type Coordinate = (Int, Int)
-
-instance Show Board where
-  show (Board a) = unlines $ map showRow (take 3          a) ++ ["------+-------+------"] ++
-                             map showRow (take 3 $ drop 3 a) ++ ["------+-------+------"] ++
-                             map showRow (take 3 $ drop 6 a)
+instance Show a => Show (Board a) where
+  show (Board a) = unlines $ (take 3          rows) ++ [sep] ++
+                             (take 3 $ drop 3 rows) ++ [sep] ++
+                             (take 3 $ drop 6 rows)
     where
-    showRow :: [Maybe Int] -> String
-    showRow a = intersperse ' ' $ concatMap showPosition (take 3          a) ++ "|" ++
-                                  concatMap showPosition (take 3 $ drop 3 a) ++ "|" ++
-                                  concatMap showPosition (take 3 $ drop 6 a)
-    showPosition :: Maybe Int -> String
+    sepEdge = replicate (maxLen * 3 + 3) '-'
+    sepCenter = '-' : sepEdge
+    sep = sepEdge ++ "+" ++ sepCenter ++ "+" ++ sepEdge
+    positions' = map (map showPosition) a
+    maxLen = maximum $ map length $ concat positions'
+    positions :: [[String]]
+    positions  = map (map (\ a -> a ++ replicate (maxLen - length a) ' ')) positions'
+    rows = map showRow positions
+    showRow :: [String] -> String
+    showRow a = intercalate " " $ (take 3 a) ++ ["|"] ++ (take 3 $ drop 3 a) ++ ["|"] ++ (take 3 $ drop 6 a)
+    showPosition :: Show a => Maybe a -> String
     showPosition a = case a of
       Nothing -> " "
       Just a  -> show a
 
 -- | Parse a string into a Board.
-parseBoard :: String -> Board
+parseBoard :: String -> Board Int
 parseBoard = Board . take 9 . map parseLine . (++ repeat "") . lines
   where
   parseLine :: String -> [Maybe Int]
